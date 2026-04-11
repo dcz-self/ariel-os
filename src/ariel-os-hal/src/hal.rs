@@ -34,9 +34,7 @@ pub use define_peripherals::*;
 
 cfg_select! {
     context = "native" => {
-        //mod dummy;
         pub use ariel_os_native::*;
-        //pub use dummy::{gpio, peripheral, peripheral::IntoPeripheral};
     }
     context = "nrf" => {
         pub use ariel_os_nrf::*;

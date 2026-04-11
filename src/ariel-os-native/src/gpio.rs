@@ -2,8 +2,6 @@
 pub use ariel_os_dummy::gpio::input;
 pub use ariel_os_dummy::peripheral::Peri;
 
-pub struct Pin(u8);
-
 //impl private::Sealed for Peripheral {}
 
 impl<T> crate::IntoPeripheral<'_, T> for Peri<'static, T> {
@@ -29,15 +27,16 @@ pub mod output {
     pub const SPEED_CONFIGURABLE: bool = false;
 
     pub fn new<'a, T: OutputPin>(
-        pin: //impl crate::IntoPeripheral<'a, T>,
-        super::Peri<'a, T>,
+        pin: super::Peri<'a, T>,
         _initial_level: ariel_os_embassy_common::gpio::Level,
         _drive_strength: super::DriveStrength,
         _speed: super::Speed,
     ) -> Output<'a> {
         Output {
             _marker: Default::default(),
-            pin_number: 0,
+            // Don't carry the channel.
+            // The channel should survive even if the pin gets destroyed.
+            pin_number: T::PIN_NUMBER,
         }
     }
 

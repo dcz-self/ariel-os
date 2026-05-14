@@ -11,31 +11,47 @@ pub mod identity;
 pub mod peripherals {
     use std::sync::{Arc, Mutex, mpsc};
 
-    //. Asynchronous stream of emulated hardware events
+    //. Asynchronous stream of emulated hardware outputs
     pub struct OutStream<T> {
-        /// The emulated board manager inside the user's application should listen on this for incomind messages and handle them
+        /// The emulated board manager inside the user's application should listen on this for incoming messages and handle them
         pub recv: Arc<Mutex<mpsc::Receiver<T>>>,
         /// The native board will push events to the manager using this
         pub(crate) sender: mpsc::Sender<T>,
     }
 
+    //. Asynchronous stream of emulated hardware inputs
+    pub struct InStream<T> {
+        /// The emulated board manager inside the user's application can use this to push events to the application.
+        pub sender: mpsc::Sender<T>,
+        /// The native board uses this to listen to events coming from the manager
+        pub(crate) recv: Arc<Mutex<mpsc::Receiver<T>>>,
+    }
+
     use crate::gpio::output::OutputPin;
+    use crate::gpio::input::InputPin;
     pub struct GPIO0;
+    pub struct GPIO1;
 
     impl OutputPin for GPIO0 {
-        const PIN_NUMBER: usize = 0;
+        const OUT_PIN_NUMBER: usize = 0;
+    }
+
+    impl InputPin for GPIO1 {
+        const IN_PIN_NUMBER: usize = 0;
     }
 }
 
 #[allow(non_snake_case)]
 pub struct OptionalPeripherals {
     pub GPIO0: Option<crate::peripheral::Peri<'static, peripherals::GPIO0>>,
+    pub GPIO1: Option<crate::peripheral::Peri<'static, peripherals::GPIO1>>,
 }
 
 #[must_use]
 pub fn init() -> OptionalPeripherals {
     OptionalPeripherals {
         GPIO0: Some(crate::peripheral::Peri::empty()),
+        GPIO1: Some(crate::peripheral::Peri::empty()),
     }
 }
 

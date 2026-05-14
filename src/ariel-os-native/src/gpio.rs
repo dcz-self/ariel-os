@@ -1,5 +1,3 @@
-
-pub use ariel_os_dummy::gpio::input;
 pub use ariel_os_dummy::peripheral::Peri;
 
 //impl private::Sealed for Peripheral {}
@@ -8,6 +6,104 @@ impl<T> crate::IntoPeripheral<'_, T> for Peri<'static, T> {
     fn into_hal_peripheral(self) -> Self {
         self
     }
+}
+
+pub mod input {
+    use std::sync::{Arc, LazyLock, Mutex, mpsc};
+    use ariel_os_embassy_common::gpio::Level;
+    use embedded_hal::digital::InputPin as HalInputPin;
+    use crate::peripherals::InStream;
+
+    // TODO: send configuration: pullups, hi-Z, etc.
+    pub static STREAMS: LazyLock<[InStream<Level>; 1]> = LazyLock::new(|| {
+        let init = || {
+            let (sender, recv) = mpsc::channel();
+            InStream {
+                recv: Arc::new(Mutex::new(recv)),
+                sender,
+            }
+        };
+        [init()]
+    });
+
+    pub trait InputPin {
+        /// Index to the STREAMS array
+        const IN_PIN_NUMBER: usize;
+    }
+
+    pub const SCHMITT_TRIGGER_CONFIGURABLE: bool = false;
+
+    #[derive(Debug, PartialEq, Clone, Copy)]
+    pub struct PinState {
+        level: Level,
+    }
+
+    pub struct Input<'d> {
+        _marker: core::marker::PhantomData<&'d ()>,
+        pin_number: usize,
+        state: PinState,
+    }
+
+    impl Input<'_> {
+        #[must_use]
+        pub fn is_high(&self) -> bool {
+            self.state == PinState { level: Level::High }
+        }
+
+        #[must_use]
+        pub fn is_low(&self) -> bool {
+            self.state == PinState { level: Level::Low }
+        }
+
+        #[must_use]
+        pub fn get_level(&self) -> crate::gpio::input::Level {
+            self.state.level
+        }
+
+        pub async fn wait_for_high(&mut self) {
+            unimplemented!();
+        }
+
+        pub async fn wait_for_low(&mut self) {
+            unimplemented!();
+        }
+
+        pub async fn wait_for_rising_edge(&mut self) {
+            unimplemented!();
+        }
+
+        pub async fn wait_for_falling_edge(&mut self) {
+            unimplemented!();
+        }
+
+        pub async fn wait_for_any_edge(&mut self) {
+            unimplemented!();
+        }
+    }
+
+    impl embedded_hal::digital::ErrorType for Input<'_> {
+        type Error = core::convert::Infallible;
+    }
+
+    impl embedded_hal::digital::InputPin for Input<'_> {
+        fn is_low(&mut self) -> Result<bool, Self::Error> {
+            todo!();
+        }
+
+        fn is_high(&mut self) -> Result<bool, Self::Error> {
+            todo!();
+        }
+    }
+
+    pub fn new<'a, T: InputPin>(
+        _pin: super::Peri<'a, T>,
+        _pull: ariel_os_embassy_common::gpio::Pull,
+        _schmitt_trigger: bool,
+    ) -> Result<Input<'a>, ariel_os_embassy_common::gpio::input::Error> {
+        todo!();
+    }
+
+    ariel_os_embassy_common::define_into_level!();
 }
 
 pub mod output {
@@ -29,13 +125,14 @@ pub mod output {
     });
 
     pub trait OutputPin {
-        /// Index to the peripherals::OUT_STREAMS array
-        const PIN_NUMBER: usize;
+        /// Index to the STREAMS array
+        const OUT_PIN_NUMBER: usize;
     }
 
     #[derive(Debug, PartialEq, Clone, Copy)]
     pub struct PinState {
         level: ariel_os_embassy_common::gpio::Level,
+        // TODO: add drive strength and other stuff
     }
 
     pub const DRIVE_STRENGTH_CONFIGURABLE: bool = false;
@@ -52,7 +149,7 @@ pub mod output {
             _marker: Default::default(),
             // Don't carry the channel.
             // The channel should survive even if the pin gets destroyed.
-            pin_number: T::PIN_NUMBER,
+            pin_number: T::OUT_PIN_NUMBER,
             state: state.clone(),
         };
         ret.send_update(state);

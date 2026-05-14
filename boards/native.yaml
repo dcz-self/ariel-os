@@ -5,3 +5,7 @@ targets:
     leds:
       led0:
         pin: GPIO0
+    buttons:
+      button0:
+        pin: GPIO1
+        active: low

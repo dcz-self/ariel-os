@@ -50,7 +50,8 @@ cfg_select! {
     }
     context = "ariel-os" => {
         compile_error!("this MCU family is not supported");
-    } else {
+    }
+    _ => {
         mod dummy;
         pub use dummy::*;
     }

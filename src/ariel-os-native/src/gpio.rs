@@ -15,13 +15,10 @@ pub mod input {
     use crate::peripherals::InStream;
 
     // TODO: send configuration: pullups, hi-Z, etc.
-    pub static STREAMS: LazyLock<[InStream<Level>; 1]> = LazyLock::new(|| {
+    // TODO: use a single atomic int
+    pub static STATES: LazyLock<[Arc<Mutex<PinState>>; 1]> = LazyLock::new(|| {
         let init = || {
-            let (sender, recv) = mpsc::channel();
-            InStream {
-                recv: Arc::new(Mutex::new(recv)),
-                sender,
-            }
+            Arc::new(Mutex::new(PinState { level: Level::Low }))
         };
         [init()]
     });
@@ -35,29 +32,28 @@ pub mod input {
 
     #[derive(Debug, PartialEq, Clone, Copy)]
     pub struct PinState {
-        level: Level,
+        pub level: Level,
     }
 
     pub struct Input<'d> {
         _marker: core::marker::PhantomData<&'d ()>,
         pin_number: usize,
-        state: PinState,
     }
 
     impl Input<'_> {
         #[must_use]
         pub fn is_high(&self) -> bool {
-            self.state == PinState { level: Level::High }
+            *STATES[self.pin_number].lock().unwrap() == PinState { level: Level::High }
         }
 
         #[must_use]
         pub fn is_low(&self) -> bool {
-            self.state == PinState { level: Level::Low }
+            *STATES[self.pin_number].lock().unwrap() == PinState { level: Level::Low }
         }
 
         #[must_use]
         pub fn get_level(&self) -> crate::gpio::input::Level {
-            self.state.level
+            STATES[self.pin_number].lock().unwrap().level
         }
 
         pub async fn wait_for_high(&mut self) {
@@ -96,11 +92,20 @@ pub mod input {
     }
 
     pub fn new<'a, T: InputPin>(
-        _pin: super::Peri<'a, T>,
+        pin: super::Peri<'a, T>,
         _pull: ariel_os_embassy_common::gpio::Pull,
         _schmitt_trigger: bool,
     ) -> Result<Input<'a>, ariel_os_embassy_common::gpio::input::Error> {
-        todo!();
+        let state = PinState { level: Level::Low };
+        let ret = Input {
+            _marker: Default::default(),
+            // Don't carry the comm channel.
+            // The channel should survive even if the pin gets destroyed.
+            pin_number: T::IN_PIN_NUMBER,
+        };
+        // FIXME: notify the manager about the new pullup config
+        //ret.send_update(state);
+        Ok(ret)
     }
 
     ariel_os_embassy_common::define_into_level!();
@@ -131,7 +136,7 @@ pub mod output {
 
     #[derive(Debug, PartialEq, Clone, Copy)]
     pub struct PinState {
-        level: ariel_os_embassy_common::gpio::Level,
+        pub level: ariel_os_embassy_common::gpio::Level,
         // TODO: add drive strength and other stuff
     }
 
